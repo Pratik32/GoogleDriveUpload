@@ -9,6 +9,11 @@ import java.util.Scanner;
 import static main.drive.Constants.*;
 /**
  * Created by ps on 29/11/17.
+ * A simple uploader class that takes a folder/file as an argument
+ * and uploads them to your google drive.Google drive's client library is not
+ * used here as I feel they are very heavy and poorly documented.
+ * Here we are straight-forward making http/https calls to specified endpoints
+ * and getting the job done.
  */
 public class Uploader {
     public static void main(String[] args) throws IOException {
@@ -37,11 +42,13 @@ public class Uploader {
         upload(file,uploadurl,accesstoken);
 
     }
-
+    /*
+         The 'Content-Type' header is optional,drive detects it automatically.
+     */
     public static void upload(File file,String uploadurl,String accesscode) throws IOException {
         HttpsURLConnection conn=null;
         Map<String,String> headers=new HashMap<String, String>();
-        headers.put("Content-Type","text/plain");
+        //headers.put("Content-Type","text/plain");
         headers.put("Content-Length",Integer.toString((int)file.length()));
         headers.put("Authorization","Bearer "+accesscode);
         conn=buildHttpsConnection(uploadurl,headers,"PUT",null,file);
@@ -49,6 +56,16 @@ public class Uploader {
         System.out.println(conn.getResponseCode());
 
     }
+    /*
+        For v2 APIs,access token can be generated as follwing:
+        1)A POST request at https://docs.google.com/feeds returns
+        you 'device_code' which is used  for sending a access_token.This
+        API call is for device authentication and it is done only once.
+        2)'device_code' is use for sending access_token request at
+        https://accounts.google.com/o/oauth2/device/code. Output of this
+        request is a json array that contains access_token and a refresh_token.
+        3)refresh_token can be used to obtain access_token after it expires.
+     */
     public static void generatev2AccessToken() throws IOException {
         String params = "client_id=" + CLIENT_ID + "&" + "scope=" + DEVICE_CODE_SCOPE;
         Map<String,String> header=new HashMap<String, String>();
@@ -87,8 +104,17 @@ public class Uploader {
         saveTokens(tokens[0],tokens[1]);
     }
 
+    /*
+        For v3 APIs access token can be generated as follows.
+        1)A POST request @https://accounts.google.com/o/oauth2/auth returns
+        a 'code' at specified redirection url.This is where we allow our program
+        to manage(Upload in this case) the user's drive data.This is done only once.
+        2)'code' is then used to obtain access_token by a POST request
+        @https://accounts.google.com/o/oauth2/token.This returns a json array that
+        contains access and refresh tokens.
+     */
     public static void generatev3token() throws IOException {
-        String url=V3_URL+"redirect_uri="+"https://localhost&"+"response_type=code&"+
+        String url=V3_URL+"redirect_uri="+REDIRECT_URI+"response_type=code&"+
                     "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
         System.out.println("Go the following url:"+url);
         HttpsURLConnection conn;
@@ -106,6 +132,7 @@ public class Uploader {
         String[] temp=getValuesForKeys(reader,"access_token","refresh_token");
         saveTokens(temp[0],temp[1]);
     }
+
     public static String[] getValuesForKeys(BufferedReader reader, String key1,String key2) throws IOException {
         String str = null;
         String value1 = "";
@@ -133,6 +160,10 @@ public class Uploader {
         }
     }
 
+    /*
+        Build a Http/Https request with given 'url'.and headers in 'headers' map.
+        'body' and 'file' are optional arguments may not be present all the time.
+     */
     public static HttpsURLConnection buildHttpsConnection(String url,Map<String,String> headers,String method,String body,File file){
         HttpsURLConnection conn=null;
         try {
