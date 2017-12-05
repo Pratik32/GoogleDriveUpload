@@ -18,8 +18,10 @@ import static main.drive.Constants.*;
 public class Uploader {
     public static void main(String[] args) throws IOException {
 
+
         String accesstoken="",refreshtoken="";
-        if(!new File(".creds").exists()){
+        System.out.println(CREDFILE);
+        if(!new File(CREDFILE).exists()){
             generatev3token();
         }
         String[] temp=readTokensFromFile();
@@ -56,16 +58,6 @@ public class Uploader {
         System.out.println(conn.getResponseCode());
 
     }
-    /*
-        For v2 APIs,access token can be generated as follwing:
-        1)A POST request at https://docs.google.com/feeds returns
-        you 'device_code' which is used  for sending a access_token.This
-        API call is for device authentication and it is done only once.
-        2)'device_code' is use for sending access_token request at
-        https://accounts.google.com/o/oauth2/device/code. Output of this
-        request is a json array that contains access_token and a refresh_token.
-        3)refresh_token can be used to obtain access_token after it expires.
-     */
     public static void generatev2AccessToken() throws IOException {
         String params = "client_id=" + CLIENT_ID + "&" + "scope=" + DEVICE_CODE_SCOPE;
         Map<String,String> header=new HashMap<String, String>();
@@ -104,15 +96,7 @@ public class Uploader {
         saveTokens(tokens[0],tokens[1]);
     }
 
-    /*
-        For v3 APIs access token can be generated as follows.
-        1)A POST request @https://accounts.google.com/o/oauth2/auth returns
-        a 'code' at specified redirection url.This is where we allow our program
-        to manage(Upload in this case) the user's drive data.This is done only once.
-        2)'code' is then used to obtain access_token by a POST request
-        @https://accounts.google.com/o/oauth2/token.This returns a json array that
-        contains access and refresh tokens.
-     */
+
     public static void generatev3token() throws IOException {
         String url=V3_URL+"redirect_uri="+REDIRECT_URI+"response_type=code&"+
                     "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
@@ -200,7 +184,7 @@ public class Uploader {
         return conn;
     }
     private static void saveTokens(String access,String refresh){
-        File file=new File(".creds");
+        File file=new File(CREDFILE);
         try {
             FileOutputStream stream=new FileOutputStream(file,true);
             stream.write(access.getBytes());
@@ -225,6 +209,10 @@ public class Uploader {
             e.printStackTrace();
         }
         return tokens;
+    }
+    private static void refreshAccessToken(String refreshToken){
+
+
     }
 }
 

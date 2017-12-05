@@ -15,5 +15,6 @@ public class Constants {
     public static final String V3_URL="https://accounts.google.com/o/oauth2/auth?";
     public static final String V3_SCOPE="https://www.googleapis.com/auth/drive";
     public static final String REDIRECT_URI="https://localhost";
-}
+    public static final String CREDFILE=System.clearProperty("user.home")+"/.creds";
 
+}
