@@ -18,17 +18,39 @@ import static main.drive.Constants.*;
 public class Uploader {
     public static void main(String[] args) throws IOException {
 
+        String str=new Scanner(System.in).next();
+        Authenticator authenticator=new Authenticator();
+        Uploader uploader=new Uploader();
+        File file=new File(str);
+        authenticator.setUserCredentials(CLIENT_ID,CLIENT_SECRET);
+        String accesstoken=authenticator.getAccessToken();
+        String url=uploader.getLocationUrl(accesstoken,file);
+        uploader.upload(file,url,accesstoken);
 
-        String accesstoken="",refreshtoken="";
-        System.out.println(CREDFILE);
-        if(!new File(CREDFILE).exists()){
-            generatev3token();
+    }
+
+    /*
+         The 'Content-Type' header is optional,drive detects it automatically.
+     */
+    private  void upload(File file,String uploadurl,String accesscode){
+        HttpsURLConnection conn=null;
+        Map<String,String> headers=new HashMap<String, String>();
+        //headers.put("Content-Type","text/plain");
+        headers.put("Content-Length",Integer.toString((int)file.length()));
+        headers.put("Authorization","Bearer "+accesscode);
+        conn=buildHttpsConnection(uploadurl,headers,"PUT",null,file);
+        try {
+            conn.connect();
+            System.out.println(conn.getResponseCode());
+        }catch (IOException e){
+
         }
-        String[] temp=readTokensFromFile();
-        accesstoken=temp[0];
-        refreshtoken=temp[1];
-        System.out.println(accesstoken);
-        File file=new File("test.txt");
+    }
+
+    /*
+        Get the location url of given file,for uploading the data.
+     */
+    private String getLocationUrl(String accesstoken,File file){
         String body="{\"name\": \""+file.getName()+"\"}";
         Map<String,String> headers=new HashMap<String, String>();
         headers.put("Authorization","Bearer "+accesstoken);
@@ -37,84 +59,15 @@ public class Uploader {
         headers.put("Content-Type","application/json; charset=UTF-8");
         headers.put("Content-Length",Integer.toString(body.length()));
         HttpsURLConnection conn=buildHttpsConnection(UPLOAD_URI,headers,"POST",body,null);
-        conn.connect();
-        System.out.println(conn.getResponseCode());
+        try {
+            conn.connect();
+            System.out.println(conn.getResponseCode());
+        }catch (IOException e){
+
+        }
         String uploadurl=conn.getHeaderField("Location");
         System.out.println(uploadurl);
-        upload(file,uploadurl,accesstoken);
-
-    }
-    /*
-         The 'Content-Type' header is optional,drive detects it automatically.
-     */
-    public static void upload(File file,String uploadurl,String accesscode) throws IOException {
-        HttpsURLConnection conn=null;
-        Map<String,String> headers=new HashMap<String, String>();
-        //headers.put("Content-Type","text/plain");
-        headers.put("Content-Length",Integer.toString((int)file.length()));
-        headers.put("Authorization","Bearer "+accesscode);
-        conn=buildHttpsConnection(uploadurl,headers,"PUT",null,file);
-        conn.connect();
-        System.out.println(conn.getResponseCode());
-
-    }
-    public static void generatev2AccessToken() throws IOException {
-        String params = "client_id=" + CLIENT_ID + "&" + "scope=" + DEVICE_CODE_SCOPE;
-        Map<String,String> header=new HashMap<String, String>();
-        header.put("Content-Type", "application/x-www-form-urlencoded");
-        header.put("Content-Length", Integer.toString(params.length()));
-        HttpsURLConnection conn=buildHttpsConnection(DEVICE_CODE_URL,null,"POST",params,null);
-        System.out.println(conn.getResponseCode());
-        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String str = null;
-        String devicecode = "";
-        String usercode = "";
-        while ((str = reader.readLine()) != null) {
-            if (str.contains("\"user_code\"")) {
-                int temp = str.indexOf(':');
-                usercode = str.substring(temp + 3, str.length() - 1);
-            } else if (str.contains("\"device_code\"")) {
-                int temp = str.indexOf(':');
-                devicecode = str.substring(temp + 3, str.length() - 2);
-            }
-        }
-        System.out.println("User code is :" + usercode);
-        System.out.println("Device code is :" + devicecode);
-        conn.disconnect();
-        Scanner scanner = new Scanner(System.in);
-        String temp = scanner.next();
-        params = "client_id=" + CLIENT_ID + "&" + "client_secret=" + CLIENT_SECRET + "&" +
-                "code=" + devicecode + "&" + "grant_type=" + GRANT_TYPE;
-        header=new HashMap<String, String>();
-        header.put("Content-Type", "application/x-www-form-urlencoded");
-        header.put("Content-Length", Integer.toString(params.length()));
-        conn=buildHttpsConnection(AUTH_URL,header,"POST",params,null);
-        conn.connect();
-        System.out.println(conn.getResponseCode());
-        reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String tokens[]=getValuesForKeys(reader,"access_token","refresh_token");
-        saveTokens(tokens[0],tokens[1]);
-    }
-
-
-    public static void generatev3token() throws IOException {
-        String url=V3_URL+"redirect_uri="+REDIRECT_URI+"response_type=code&"+
-                    "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
-        System.out.println("Go the following url:"+url);
-        HttpsURLConnection conn;
-        String code=new Scanner(System.in).next();
-        conn=(HttpsURLConnection)new URL(AUTH_URL).openConnection();
-        String params="";
-        params="code="+code+"&client_id="+CLIENT_ID+"&client_secret="+CLIENT_SECRET+
-                        "&redirect_uri="+REDIRECT_URI+"&grant_type=authorization_code";
-        Map<String,String> headers=new HashMap<String, String>();
-        headers.put("Content-Type","application/x-www-form-urlencoded");
-        conn=buildHttpsConnection(AUTH_URL,headers,"POST",params,null);
-        conn.connect();
-        System.out.println(conn.getResponseCode());
-        BufferedReader reader=new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String[] temp=getValuesForKeys(reader,"access_token","refresh_token");
-        saveTokens(temp[0],temp[1]);
+        return uploadurl;
     }
 
     public static String[] getValuesForKeys(BufferedReader reader, String key1,String key2) throws IOException {
@@ -183,20 +136,6 @@ public class Uploader {
         }
         return conn;
     }
-    private static void saveTokens(String access,String refresh){
-        File file=new File(CREDFILE);
-        try {
-            FileOutputStream stream=new FileOutputStream(file,true);
-            stream.write(access.getBytes());
-            stream.write('\n');
-            stream.write(refresh.getBytes());
-            stream.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
     private static String[] readTokensFromFile(){
         String[] tokens=new String[2];
         try {
@@ -210,9 +149,4 @@ public class Uploader {
         }
         return tokens;
     }
-    private static void refreshAccessToken(String refreshToken){
-
-
-    }
 }
-

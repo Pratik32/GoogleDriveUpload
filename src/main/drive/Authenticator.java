@@ -20,7 +20,14 @@ public class Authenticator {
 
     public static final String CREDS_FILE=System.getProperty("user.home")+"/"+".creds";
     public static final String TOKEN_FILE=System.getProperty("user.home")+"/"+".tokens";
+    private String refreshtoken="";
     protected String getAccessToken() throws IOException {
+
+        if(new File(TOKEN_FILE).exists()){
+            String temp[]=readTokensFromFile();
+            refreshtoken=temp[1];
+            return temp[0];
+        }
         return generatev3token();
     }
 
@@ -34,7 +41,7 @@ public class Authenticator {
        contains access and refresh tokens.
     */
     private String generatev3token() throws IOException {
-        String url=V3_URL+"redirect_uri="+REDIRECT_URI+"response_type=code&"+
+        String url=V3_URL+"redirect_uri="+REDIRECT_URI+"&response_type=code&"+
                 "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
         System.out.println("Go the following url:"+url);
         HttpsURLConnection conn;
@@ -50,7 +57,7 @@ public class Authenticator {
         System.out.println(conn.getResponseCode());
         BufferedReader reader=new BufferedReader(new InputStreamReader(conn.getInputStream()));
         String[] temp=getValuesForKeys(reader,"access_token","refresh_token");
-        saveToFile(temp[0],temp[1]);
+        saveToFile(TOKEN_FILE,temp[0],temp[1]);
         return temp[0];
     }
 
@@ -109,7 +116,7 @@ public class Authenticator {
     private void saveToFile(String filename,String... data){
         File file=new File(filename);
         try{
-            BufferedWriter writer=new BufferedWriter(new FileWriter(file));
+            BufferedWriter writer=new BufferedWriter(new FileWriter(file,true));
 
             for(String str:data){
                 writer.write(str+"\n");
@@ -126,5 +133,18 @@ public class Authenticator {
 
 
 
+    }
+    private static String[] readTokensFromFile(){
+        String[] tokens=new String[2];
+        try {
+            BufferedReader reader=new BufferedReader(new FileReader(new File(TOKEN_FILE)));
+            tokens[0]=reader.readLine();
+            tokens[1]=reader.readLine();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return tokens;
     }
 }
