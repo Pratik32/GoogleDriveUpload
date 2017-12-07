@@ -35,7 +35,7 @@ public class Uploader {
     private  void upload(File file,String uploadurl,String accesscode){
         HttpsURLConnection conn=null;
         Map<String,String> headers=new HashMap<String, String>();
-        //headers.put("Content-Type","text/plain");
+        headers.put("Content-Type","image/png");
         headers.put("Content-Length",Integer.toString((int)file.length()));
         headers.put("Authorization","Bearer "+accesscode);
         conn=buildHttpsConnection(uploadurl,headers,"PUT",null,file);
@@ -54,7 +54,7 @@ public class Uploader {
         String body="{\"name\": \""+file.getName()+"\"}";
         Map<String,String> headers=new HashMap<String, String>();
         headers.put("Authorization","Bearer "+accesstoken);
-        headers.put("X-Upload-Content-Type","text/plain");
+        headers.put("X-Upload-Content-Type","image/png");
         headers.put("X-Upload-Content-Length",Integer.toString((int) file.length()));
         headers.put("Content-Type","application/json; charset=UTF-8");
         headers.put("Content-Length",Integer.toString(body.length()));
@@ -120,7 +120,6 @@ public class Uploader {
                 stream.close();
             }
             if (file!=null){
-                conn.setRequestProperty("Content-Length",Integer.toString((int) file.length()));
                 ByteArrayOutputStream stream=new ByteArrayOutputStream();
                 FileInputStream stream1=new FileInputStream(file);
                 int temp;

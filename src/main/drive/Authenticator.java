@@ -19,16 +19,36 @@ import static main.drive.Uploader.getValuesForKeys;
 public class Authenticator {
 
     public static final String CREDS_FILE=System.getProperty("user.home")+"/"+".creds";
+    public static final String AUTH_URL="https://accounts.google.com/o/oauth2/token";
     public static final String TOKEN_FILE=System.getProperty("user.home")+"/"+".tokens";
+    public static final String AUTHORIZATION_CODE="authorization_code";
+    public static final String REFRESH_TOKEN="refresh_token";
+    public static final long ACCESS_TOKEN_VALIDITY=3000*1000;
     private String refreshtoken="";
-    protected String getAccessToken() throws IOException {
+    private String accesstoken="";
+    private long lasttokentime=0;
 
-        if(new File(TOKEN_FILE).exists()){
-            String temp[]=readTokensFromFile();
-            refreshtoken=temp[1];
-            return temp[0];
+    /*
+        Load tokens from tokens file.
+     */
+    protected Authenticator(){
+        if(new File(TOKEN_FILE).exists()) {
+            String temp[] = readTokensFromFile();
+            accesstoken = temp[0];
+            refreshtoken = temp[1];
+            lasttokentime = Long.parseLong(temp[2]);
         }
-        return generatev3token();
+    }
+    protected String getAccessToken() throws IOException {
+       if(new File(TOKEN_FILE).exists()){
+            if (!isTokenValid()){
+                System.out.println("Refreshing access token ...");
+                refreshAccessToken(refreshtoken,REFRESH_TOKEN);;
+            }
+           }else{
+            generatev3token();
+        }
+        return accesstoken;
     }
 
     /*
@@ -40,29 +60,40 @@ public class Authenticator {
        @https://accounts.google.com/o/oauth2/token.This returns a json array that
        contains access and refresh tokens.
     */
-    private String generatev3token() throws IOException {
+    private void generatev3token() throws IOException {
         String url=V3_URL+"redirect_uri="+REDIRECT_URI+"&response_type=code&"+
                 "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
         System.out.println("Go the following url:"+url);
         HttpsURLConnection conn;
         String code=new Scanner(System.in).next();
         conn=(HttpsURLConnection)new URL(AUTH_URL).openConnection();
-        String params="";
-        params="code="+code+"&client_id="+CLIENT_ID+"&client_secret="+CLIENT_SECRET+
-                "&redirect_uri="+REDIRECT_URI+"&grant_type=authorization_code";
-        Map<String,String> headers=new HashMap<String, String>();
-        headers.put("Content-Type","application/x-www-form-urlencoded");
-        conn=buildHttpsConnection(AUTH_URL,headers,"POST",params,null);
-        conn.connect();
-        System.out.println(conn.getResponseCode());
-        BufferedReader reader=new BufferedReader(new InputStreamReader(conn.getInputStream()));
-        String[] temp=getValuesForKeys(reader,"access_token","refresh_token");
-        saveToFile(TOKEN_FILE,temp[0],temp[1]);
-        return temp[0];
+        String[] temp=exchangeTokens("code",code,AUTHORIZATION_CODE);
+        lasttokentime=System.currentTimeMillis();
+        saveToFile(TOKEN_FILE,temp[0],temp[1],Long.toString(lasttokentime));
+        accesstoken=temp[0];
+        refreshtoken=temp[1];
     }
 
+    private String[] exchangeTokens(String codetype,String code ,String granttype){
+        String params=codetype+"="+code+"&client_id="+CLIENT_ID+"&client_secret="+CLIENT_SECRET+
+                "&redirect_uri="+REDIRECT_URI+"&grant_type="+granttype;
+        Map<String,String> headers=new HashMap<String, String>();
+        headers.put("Content-Type","application/x-www-form-urlencoded");
+        HttpsURLConnection conn=buildHttpsConnection(AUTH_URL,headers,"POST",params,null);
+        String tokens[]=null;
+        try{
+            conn.connect();
+            System.out.println(conn.getResponseCode());
+            BufferedReader reader=new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            tokens=getValuesForKeys(reader,"access_token","refresh_token");
+        }catch (IOException e){
+        }
+
+        return tokens;
+
+    }
     /*
-      For v2 APIs,access token can be generated as follwing:
+      For v2 APIs,access token can be generated as following:
       1)A POST request at https://docs.google.com/feeds returns
       you 'device_code' which is used  for sending a access_token.This
       API call is for device authentication and it is done only once.
@@ -117,7 +148,7 @@ public class Authenticator {
         File file=new File(filename);
         try{
             BufferedWriter writer=new BufferedWriter(new FileWriter(file,true));
-
+            writer.write("");
             for(String str:data){
                 writer.write(str+"\n");
             }
@@ -129,22 +160,30 @@ public class Authenticator {
         }
 
     }
-    private void refreshAccessToken(){
-
-
-
+    private void refreshAccessToken(String code,String granttype){
+        String tokens[]=exchangeTokens("refresh_token",refreshtoken,REFRESH_TOKEN);
+        lasttokentime=System.currentTimeMillis();
+        accesstoken=tokens[0];
+        refreshtoken=tokens[1];
+        saveToFile(TOKEN_FILE,accesstoken,refreshtoken,Long.toString(lasttokentime));
     }
     private static String[] readTokensFromFile(){
-        String[] tokens=new String[2];
+        String[] tokens=new String[3];
         try {
             BufferedReader reader=new BufferedReader(new FileReader(new File(TOKEN_FILE)));
             tokens[0]=reader.readLine();
             tokens[1]=reader.readLine();
+            tokens[2]=reader.readLine();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
         return tokens;
+    }
+
+    private boolean isTokenValid(){
+        return (System.currentTimeMillis()-lasttokentime)<ACCESS_TOKEN_VALIDITY;
+
     }
 }
