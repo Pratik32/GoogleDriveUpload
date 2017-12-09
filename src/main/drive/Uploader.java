@@ -2,11 +2,10 @@ package main.drive;
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
-
-import static main.drive.Constants.*;
 /**
  * Created by ps on 29/11/17.
  * A simple uploader class that takes a folder/file as an argument
@@ -16,17 +15,37 @@ import static main.drive.Constants.*;
  * and getting the job done.
  */
 public class Uploader {
-    public static void main(String[] args) throws IOException {
+    public static final String UPLOAD_URI="https://www.googleapis.com/upload/drive/v3/files/?uploadType=resumable";
 
-        String str=new Scanner(System.in).next();
+    public static void main(String[] args) throws IOException {
+        Scanner sc=new Scanner(System.in);
         Authenticator authenticator=new Authenticator();
         Uploader uploader=new Uploader();
-        File file=new File(str);
-        authenticator.setUserCredentials(CLIENT_ID,CLIENT_SECRET);
-        String accesstoken=authenticator.getAccessToken();
-        String url=uploader.getLocationUrl(accesstoken,file);
-        uploader.upload(file,url,accesstoken);
-
+        if(args.length==0){
+            return;
+        }
+        if(args[0].equals("-config")) {
+            System.out.println("CLIENT ID:");
+            String id = sc.next();
+            System.out.println("CLIENT SECRET:");
+            String secret = sc.next();
+            Authenticator.setUserCredentials(id, secret);
+            System.out.println("Credentials set successfully.");
+        }else if(args[0].equals("-r")){
+            File file=new File(args[1]);
+            for (File f:file.listFiles()){
+                String accesscode=authenticator.getAccessToken();
+                String uploadurl=uploader.getLocationUrl(accesscode,f);
+                uploader.upload(f,uploadurl,accesscode);
+            }
+        }else{
+            for(String str:args){
+                File file=new File(str);
+                String accesscode=authenticator.getAccessToken();
+                String uploadurl=uploader.getLocationUrl(accesscode,file);
+                uploader.upload(file,uploadurl,accesscode);
+            }
+        }
     }
 
     /*
@@ -54,7 +73,7 @@ public class Uploader {
         String body="{\"name\": \""+file.getName()+"\"}";
         Map<String,String> headers=new HashMap<String, String>();
         headers.put("Authorization","Bearer "+accesstoken);
-        headers.put("X-Upload-Content-Type","image/png");
+        headers.put("X-Upload-Content-Type",getMIMEType(file));
         headers.put("X-Upload-Content-Length",Integer.toString((int) file.length()));
         headers.put("Content-Type","application/json; charset=UTF-8");
         headers.put("Content-Length",Integer.toString(body.length()));
@@ -85,16 +104,6 @@ public class Uploader {
         }
         String[] tokens={value1,value2};
         return tokens;
-    }
-    public static void printResponse(HttpsURLConnection conn){
-        try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-            String str;
-            while((str=reader.readLine())!=null){
-                System.out.println(str);
-            }
-        }catch (IOException e){
-        }
     }
 
     /*
@@ -135,17 +144,23 @@ public class Uploader {
         }
         return conn;
     }
-    private static String[] readTokensFromFile(){
-        String[] tokens=new String[2];
+
+    private String getMIMEType(File file){
+        String type="";
         try {
-            BufferedReader reader=new BufferedReader(new FileReader(new File(".creds")));
-            tokens[0]=reader.readLine();
-            tokens[1]=reader.readLine();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            InputStream is = new FileInputStream(file);
+            type= URLConnection.guessContentTypeFromStream(is);
+            if (type==null){
+                type=URLConnection.guessContentTypeFromName(file.getName());
+            }
+            System.out.println("Type:="+type);
+        }catch (FileNotFoundException e){
+
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return tokens;
+        return type;
     }
+
+
 }

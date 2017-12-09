@@ -2,14 +2,9 @@ package main.drive;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
-
-import static main.drive.Constants.*;
-import static main.drive.Constants.AUTH_URL;
-import static main.drive.Constants.GRANT_TYPE;
 import static main.drive.Uploader.buildHttpsConnection;
 import static main.drive.Uploader.getValuesForKeys;
 
@@ -23,7 +18,15 @@ public class Authenticator {
     public static final String TOKEN_FILE=System.getProperty("user.home")+"/"+".tokens";
     public static final String AUTHORIZATION_CODE="authorization_code";
     public static final String REFRESH_TOKEN="refresh_token";
+    public static final String V3_SCOPE="https://www.googleapis.com/auth/drive";
+    public static final String REDIRECT_URI="https://localhost";
+    public static final String V3_URL="https://accounts.google.com/o/oauth2/auth?";
     public static final long ACCESS_TOKEN_VALIDITY=3000*1000;
+    public static  String CLIENT_ID="";
+    public static  String CLIENT_SECRET="";
+    public static final String DEVICE_CODE_SCOPE="https://docs.google.com/feeds";
+    public static final String DEVICE_CODE_URL="https://accounts.google.com/o/oauth2/device/code";
+    public static final String GRANT_TYPE="http://oauth.net/grant_type/device/1.0";
     private String refreshtoken="";
     private String accesstoken="";
     private long lasttokentime=0;
@@ -37,13 +40,14 @@ public class Authenticator {
             accesstoken = temp[0];
             refreshtoken = temp[1];
             lasttokentime = Long.parseLong(temp[2]);
+            System.out.println(lasttokentime);
         }
     }
     protected String getAccessToken() throws IOException {
        if(new File(TOKEN_FILE).exists()){
             if (!isTokenValid()){
                 System.out.println("Refreshing access token ...");
-                refreshAccessToken(refreshtoken,REFRESH_TOKEN);;
+                refreshAccessToken();;
             }
            }else{
             generatev3token();
@@ -61,12 +65,15 @@ public class Authenticator {
        contains access and refresh tokens.
     */
     private void generatev3token() throws IOException {
+        BufferedReader reader=new BufferedReader(new FileReader(new File(CREDS_FILE)));
+        CLIENT_ID=reader.readLine();
+        CLIENT_SECRET=reader.readLine();
         String url=V3_URL+"redirect_uri="+REDIRECT_URI+"&response_type=code&"+
                 "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
-        System.out.println("Go the following url:"+url);
-        HttpsURLConnection conn;
-        String code=new Scanner(System.in).next();
-        conn=(HttpsURLConnection)new URL(AUTH_URL).openConnection();
+        System.out.println("Go the following url, Authenticate to your Google account and paste the " +
+                "content of addrees bar here."+url);
+        String str=new Scanner(System.in).next();
+        String code=str.substring(str.indexOf('=')+1);
         String[] temp=exchangeTokens("code",code,AUTHORIZATION_CODE);
         lasttokentime=System.currentTimeMillis();
         saveToFile(TOKEN_FILE,temp[0],temp[1],Long.toString(lasttokentime));
@@ -140,11 +147,11 @@ public class Authenticator {
         saveToFile(TOKEN_FILE,tokens[0],tokens[1]);
         return tokens[0];
     }
-    protected void setUserCredentials(String id,String secret){
+    protected static void setUserCredentials(String id,String secret){
         saveToFile(CREDS_FILE,id,secret);
     }
 
-    private void saveToFile(String filename,String... data){
+    private static void saveToFile(String filename,String... data){
         File file=new File(filename);
         try{
             BufferedWriter writer=new BufferedWriter(new FileWriter(file,true));
@@ -160,7 +167,7 @@ public class Authenticator {
         }
 
     }
-    private void refreshAccessToken(String code,String granttype){
+    private void refreshAccessToken(){
         String tokens[]=exchangeTokens("refresh_token",refreshtoken,REFRESH_TOKEN);
         lasttokentime=System.currentTimeMillis();
         accesstoken=tokens[0];
