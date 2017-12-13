@@ -1,6 +1,7 @@
 package main.drive;
 
 import javax.net.ssl.HttpsURLConnection;
+import javax.print.DocFlavor;
 import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
@@ -109,18 +110,21 @@ public class Authenticator {
       request is a json array that contains access_token and a refresh_token.
       3)refresh_token can be used to obtain access_token after it expires.
    */
-    private String generatev2AccessToken() throws IOException {
+    private String generatev2Token() throws IOException {
+        BufferedReader reader=new BufferedReader(new FileReader(new File(CREDS_FILE)));
+        CLIENT_ID=reader.readLine();
+        CLIENT_SECRET=reader.readLine();
         String params = "client_id=" + CLIENT_ID + "&" + "scope=" + DEVICE_CODE_SCOPE;
         Map<String,String> header=new HashMap<String, String>();
         header.put("Content-Type", "application/x-www-form-urlencoded");
         header.put("Content-Length", Integer.toString(params.length()));
         HttpsURLConnection conn=buildHttpsConnection(DEVICE_CODE_URL,null,"POST",params,null);
         System.out.println(conn.getResponseCode());
-        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        BufferedReader reader1 = new BufferedReader(new InputStreamReader(conn.getInputStream()));
         String str = null;
         String devicecode = "";
         String usercode = "";
-        while ((str = reader.readLine()) != null) {
+        while ((str = reader1.readLine()) != null) {
             if (str.contains("\"user_code\"")) {
                 int temp = str.indexOf(':');
                 usercode = str.substring(temp + 3, str.length() - 1);
@@ -144,6 +148,8 @@ public class Authenticator {
         System.out.println(conn.getResponseCode());
         reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
         String tokens[]=getValuesForKeys(reader,"access_token","refresh_token");
+        accesstoken=tokens[0];
+        refreshtoken=tokens[1];
         saveToFile(TOKEN_FILE,tokens[0],tokens[1]);
         return tokens[0];
     }
@@ -154,11 +160,12 @@ public class Authenticator {
     private static void saveToFile(String filename,String... data){
         File file=new File(filename);
         try{
-            BufferedWriter writer=new BufferedWriter(new FileWriter(file,true));
-            writer.write("");
+            BufferedWriter writer=new BufferedWriter(new FileWriter(file));
+            StringBuilder builder=new StringBuilder();
             for(String str:data){
-                writer.write(str+"\n");
+                builder.append(str+"\n");
             }
+            writer.write(builder.toString());
             writer.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();

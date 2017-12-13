@@ -3,6 +3,7 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.URLEncoder;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -33,16 +34,18 @@ public class Uploader {
             System.out.println("Credentials set successfully.");
         }else if(args[0].equals("-r")){
             File file=new File(args[1]);
+            String accesstoken=authenticator.getAccessToken();
+            String dirname=file.getName();
+            String dirid=uploader.createFolder(accesstoken,"root",dirname);
             for (File f:file.listFiles()){
-                String accesscode=authenticator.getAccessToken();
-                String uploadurl=uploader.getLocationUrl(accesscode,f);
-                uploader.upload(f,uploadurl,accesscode);
+                String uploadurl=uploader.getLocationUrl(accesstoken,f,dirid);
+                uploader.upload(f,uploadurl,accesstoken);
             }
         }else{
             for(String str:args){
                 File file=new File(str);
                 String accesscode=authenticator.getAccessToken();
-                String uploadurl=uploader.getLocationUrl(accesscode,file);
+                String uploadurl=uploader.getLocationUrl(accesscode,file,"root");
                 uploader.upload(file,uploadurl,accesscode);
             }
         }
@@ -54,7 +57,7 @@ public class Uploader {
     private  void upload(File file,String uploadurl,String accesscode){
         HttpsURLConnection conn=null;
         Map<String,String> headers=new HashMap<String, String>();
-        headers.put("Content-Type","image/png");
+        headers.put("Content-Type",getMIMEType(file));
         headers.put("Content-Length",Integer.toString((int)file.length()));
         headers.put("Authorization","Bearer "+accesscode);
         conn=buildHttpsConnection(uploadurl,headers,"PUT",null,file);
@@ -69,8 +72,9 @@ public class Uploader {
     /*
         Get the location url of given file,for uploading the data.
      */
-    private String getLocationUrl(String accesstoken,File file){
-        String body="{\"name\": \""+file.getName()+"\"}";
+    private String getLocationUrl(String accesstoken,File file,String id){
+        String body="{\"name\": \""+file.getName()+"\",\"parents\": [\""+id+"\"]}";
+        System.out.println(body);
         Map<String,String> headers=new HashMap<String, String>();
         headers.put("Authorization","Bearer "+accesstoken);
         headers.put("X-Upload-Content-Type",getMIMEType(file));
@@ -89,15 +93,36 @@ public class Uploader {
         return uploadurl;
     }
 
+    private String createFolder(String accesstoken,String rootfolder,String foldername) throws IOException {
+        String id="";
+        String body="{\"name\": \""+foldername+"\",\"mimeType\": \"application/vnd.google-apps.folder\",\"parents\": [\""+rootfolder+"\"]}";
+        System.out.println(body);
+        Map<String,String> headers=new HashMap<String, String>();
+        headers.put("Authorization","Bearer "+accesstoken);
+        headers.put("Content-Length",Integer.toString(body.length()));
+        headers.put("Content-Type","application/json; charset=UTF-8");
+        String url="https://www.googleapis.com/drive/v3/files";
+        HttpsURLConnection conn=buildHttpsConnection(url,headers,"POST",body,null);
+        conn.connect();
+        System.out.println(conn.getResponseCode());
+        BufferedReader reader=new BufferedReader(new InputStreamReader(conn.getInputStream()));
+        String temp[]=getValuesForKeys(reader,"id",null);
+        id=temp[0];
+        System.out.println("id: "+id);
+        return  id;
+
+    }
     public static String[] getValuesForKeys(BufferedReader reader, String key1,String key2) throws IOException {
         String str = null;
         String value1 = "";
         String value2 = "";
         while ((str = reader.readLine()) != null) {
-            if (str.contains("\"" + key1 + "\"")) {
-                int temp = str.indexOf(':');
-                value1 = str.substring(temp + 3, str.length() - 2);
-            }else if(str.contains("\""+key2+"\"")){
+            System.out.println(str);
+            if (key1!=null && str.contains("\"" + key1 + "\"")) {
+                int start = str.indexOf(':');
+                int end=str.lastIndexOf("\"");
+                value1 = str.substring(start + 3,end);
+            }else if(key2!=null && str.contains("\""+key2+"\"")){
                 int temp=str.indexOf(':');
                 value2=str.substring(temp+3,str.length()-2);
             }
