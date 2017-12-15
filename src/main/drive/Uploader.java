@@ -22,6 +22,9 @@ public class Uploader {
         Scanner sc=new Scanner(System.in);
         Authenticator authenticator=new Authenticator();
         Uploader uploader=new Uploader();
+        args=new String[2];
+        args[0]="-r";
+        args[1]="DIR";
         if(args.length==0){
             return;
         }

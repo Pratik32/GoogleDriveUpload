@@ -43,12 +43,19 @@ public class Authenticator {
             lasttokentime = Long.parseLong(temp[2]);
             System.out.println(lasttokentime);
         }
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(new File(CREDS_FILE)));
+            CLIENT_ID = reader.readLine();
+            CLIENT_SECRET = reader.readLine();
+        }catch (IOException e){
+
+        }
     }
     protected String getAccessToken() throws IOException {
        if(new File(TOKEN_FILE).exists()){
             if (!isTokenValid()){
                 System.out.println("Refreshing access token ...");
-                refreshAccessToken();;
+                refreshAccessToken();
             }
            }else{
             generatev3token();
@@ -66,9 +73,6 @@ public class Authenticator {
        contains access and refresh tokens.
     */
     private void generatev3token() throws IOException {
-        BufferedReader reader=new BufferedReader(new FileReader(new File(CREDS_FILE)));
-        CLIENT_ID=reader.readLine();
-        CLIENT_SECRET=reader.readLine();
         String url=V3_URL+"redirect_uri="+REDIRECT_URI+"&response_type=code&"+
                 "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
         System.out.println("Go the following url, Authenticate to your Google account and paste the " +
