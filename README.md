@@ -14,7 +14,7 @@ $ java -jar uploader -config
 
 for uploading individual files:
 
-$ java -jar uploader.jar file1 .. filen
+$ java -jar uploader.jar file1 ... fileN
   
 for uploading folders.
 
