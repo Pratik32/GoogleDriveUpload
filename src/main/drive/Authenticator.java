@@ -41,12 +41,12 @@ public class Authenticator {
             accesstoken = temp[0];
             refreshtoken = temp[1];
             lasttokentime = Long.parseLong(temp[2]);
-            System.out.println(lasttokentime);
         }
         try {
             BufferedReader reader = new BufferedReader(new FileReader(new File(CREDS_FILE)));
             CLIENT_ID = reader.readLine();
             CLIENT_SECRET = reader.readLine();
+            reader.close();
         }catch (IOException e){
 
         }
@@ -75,7 +75,7 @@ public class Authenticator {
     private void generatev3token() throws IOException {
         String url=V3_URL+"redirect_uri="+REDIRECT_URI+"&response_type=code&"+
                 "client_id="+CLIENT_ID+"&"+"scope="+V3_SCOPE+"&"+"access_type=offline";
-        System.out.println("Go the following url, Authenticate to your Google account and paste the " +
+        System.out.println("Go the following url, Authenticate to your Google account ,,lick 'Allow' and paste the " +
                 "content of addrees bar here."+url);
         String str=new Scanner(System.in).next();
         String code=str.substring(str.indexOf('=')+1);
@@ -192,6 +192,7 @@ public class Authenticator {
             tokens[0]=reader.readLine();
             tokens[1]=reader.readLine();
             tokens[2]=reader.readLine();
+            reader.close();
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         } catch (IOException e) {

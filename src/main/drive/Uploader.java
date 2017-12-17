@@ -17,14 +17,11 @@ import java.util.Scanner;
  */
 public class Uploader {
     public static final String UPLOAD_URI="https://www.googleapis.com/upload/drive/v3/files/?uploadType=resumable";
-
+    public static final int OK=200;
     public static void main(String[] args) throws IOException {
         Scanner sc=new Scanner(System.in);
         Authenticator authenticator=new Authenticator();
         Uploader uploader=new Uploader();
-        args=new String[2];
-        args[0]="-r";
-        args[1]="DIR";
         if(args.length==0){
             return;
         }
@@ -37,19 +34,53 @@ public class Uploader {
             System.out.println("Credentials set successfully.");
         }else if(args[0].equals("-r")){
             File file=new File(args[1]);
-            String accesstoken=authenticator.getAccessToken();
-            String dirname=file.getName();
-            String dirid=uploader.createFolder(accesstoken,"root",dirname);
-            for (File f:file.listFiles()){
-                String uploadurl=uploader.getLocationUrl(accesstoken,f,dirid);
-                uploader.upload(f,uploadurl,accesstoken);
+            if (file.exists()) {
+                if (!file.isDirectory()) {
+                    System.out.println(file.getName() + " is not a directory");
+                    uploader.usage();
+                    return;
+                }
+                String accesstoken = authenticator.getAccessToken();
+                String dirname = file.getName();
+                String dirid = uploader.createFolder(accesstoken, "root", dirname);
+                for (File f : file.listFiles()) {
+                    if (f.isDirectory()) {
+                        System.out.println(f.getName() + " is a directory.");
+                        uploader.usage();
+                        return;
+                    }
+                    System.out.println("uploading " + f.getName() + "...");
+                    String uploadurl = uploader.getLocationUrl(accesstoken, f, dirid);
+                    int status = uploader.upload(f, uploadurl, accesstoken);
+                    if (status == OK) {
+                        System.out.println("Uploaded.");
+                    } else {
+                        System.out.println("Error uploading file.");
+                    }
+                }
+            }else{
+                System.out.println(file.getName()+" Does not exists.");
             }
         }else{
             for(String str:args){
                 File file=new File(str);
-                String accesscode=authenticator.getAccessToken();
-                String uploadurl=uploader.getLocationUrl(accesscode,file,"root");
-                uploader.upload(file,uploadurl,accesscode);
+                if (file.exists()) {
+                    if (file.isDirectory()){
+                        uploader.usage();
+                        return;
+                    }
+                    System.out.println("uploading " + file.getName() + "...");
+                    String accesscode = authenticator.getAccessToken();
+                    String uploadurl = uploader.getLocationUrl(accesscode, file, "root");
+                    int status = uploader.upload(file, uploadurl, accesscode);
+                    if (status == OK) {
+                        System.out.println("Uploaded.");
+                    } else {
+                        System.out.println("Error uploading file.");
+                    }
+                }else{
+                    System.out.println(file.getName()+" does not exists.");
+                }
             }
         }
     }
@@ -57,8 +88,9 @@ public class Uploader {
     /*
          The 'Content-Type' header is optional,drive detects it automatically.
      */
-    private  void upload(File file,String uploadurl,String accesscode){
+    private  int upload(File file,String uploadurl,String accesscode){
         HttpsURLConnection conn=null;
+        int responsecode=-1;
         Map<String,String> headers=new HashMap<String, String>();
         headers.put("Content-Type",getMIMEType(file));
         headers.put("Content-Length",Integer.toString((int)file.length()));
@@ -66,10 +98,11 @@ public class Uploader {
         conn=buildHttpsConnection(uploadurl,headers,"PUT",null,file);
         try {
             conn.connect();
-            System.out.println(conn.getResponseCode());
+            responsecode=conn.getResponseCode();
         }catch (IOException e){
 
         }
+        return responsecode;
     }
 
     /*
@@ -77,7 +110,7 @@ public class Uploader {
      */
     private String getLocationUrl(String accesstoken,File file,String id){
         String body="{\"name\": \""+file.getName()+"\",\"parents\": [\""+id+"\"]}";
-        System.out.println(body);
+        //System.out.println(body);
         Map<String,String> headers=new HashMap<String, String>();
         headers.put("Authorization","Bearer "+accesstoken);
         headers.put("X-Upload-Content-Type",getMIMEType(file));
@@ -87,19 +120,19 @@ public class Uploader {
         HttpsURLConnection conn=buildHttpsConnection(UPLOAD_URI,headers,"POST",body,null);
         try {
             conn.connect();
-            System.out.println(conn.getResponseCode());
+            //System.out.println(conn.getResponseCode());
         }catch (IOException e){
 
         }
         String uploadurl=conn.getHeaderField("Location");
-        System.out.println(uploadurl);
+        //System.out.println(uploadurl);
         return uploadurl;
     }
 
     private String createFolder(String accesstoken,String rootfolder,String foldername) throws IOException {
         String id="";
         String body="{\"name\": \""+foldername+"\",\"mimeType\": \"application/vnd.google-apps.folder\",\"parents\": [\""+rootfolder+"\"]}";
-        System.out.println(body);
+        //System.out.println(body);
         Map<String,String> headers=new HashMap<String, String>();
         headers.put("Authorization","Bearer "+accesstoken);
         headers.put("Content-Length",Integer.toString(body.length()));
@@ -107,11 +140,10 @@ public class Uploader {
         String url="https://www.googleapis.com/drive/v3/files";
         HttpsURLConnection conn=buildHttpsConnection(url,headers,"POST",body,null);
         conn.connect();
-        System.out.println(conn.getResponseCode());
+        //System.out.println(conn.getResponseCode());
         BufferedReader reader=new BufferedReader(new InputStreamReader(conn.getInputStream()));
         String temp[]=getValuesForKeys(reader,"id",null);
         id=temp[0];
-        System.out.println("id: "+id);
         return  id;
 
     }
@@ -120,7 +152,7 @@ public class Uploader {
         String value1 = "";
         String value2 = "";
         while ((str = reader.readLine()) != null) {
-            System.out.println(str);
+            //System.out.println(str);
             if (key1!=null && str.contains("\"" + key1 + "\"")) {
                 int start = str.indexOf(':');
                 int end=str.lastIndexOf("\"");
@@ -181,13 +213,18 @@ public class Uploader {
             if (type==null){
                 type=URLConnection.guessContentTypeFromName(file.getName());
             }
-            System.out.println("Type:="+type);
+            //System.out.println("Type:="+type);
         }catch (FileNotFoundException e){
 
         } catch (IOException e) {
             e.printStackTrace();
         }
         return type;
+    }
+    private void usage(){
+        System.out.println("Usage:\n"+"for uploading directories: java -jar uploader.jar " +
+                "-r <dirname>\n"+"for uploading individual files: java -jar uploader.jar"+
+                "<file1> <file2> ... <fileN>");
     }
 
 
